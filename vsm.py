@@ -3,6 +3,13 @@ import numpy as np
 
 import glob
 import re
+
+from scipy.interpolate import interp1d
+
+def nearest_idx(arr, x):
+    return np.abs(arr-x).argmin()
+
+nearest=nearest_idx
 # Class should be constructed differently with a load from file method and
 # just a df+log init
 class VSM():
