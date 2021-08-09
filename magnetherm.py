@@ -22,37 +22,25 @@ class Magnetherm():
                 self.props[prop_names[i]] = float(val)   
 
         # Getting the capacitance based on resonance frequency
-        f2C = {'1': '200 nF', '2': '88 nF', '4': '26 nF',
-               '5': '15 nF', '9': '6.2 nF'}
+        # Units of nF
+        f2C = {'1': 200, '2': 88 , '4': 26,
+               '5': 15, '9': 6.2}
         self.props['capacitance'] = f2C[str(self.props['frequency'])[0]]
 
 
         self.df = pd.read_csv(filename, comment='#', delimiter='\t')
         
-    # def split(self, idx, lims=[1, 0.5]):
-    #     t, T = self.df.Time.iloc[idx], self.df['Temperature Sample'].iloc[idx]
-
-    #     baseline = T[:5].mean()
-    #     t, T = t-t[0], T-T[0]
-    
-    #     # from itertools import groupby
-    #     # T = np.array([k for k,g in groupby(T) if k!=0])
-    
-    #     # Filter out bad data
-    #     # selection = np.ones(T.size, dtype=booal)
-    #     # selection[1:] = T[1:] != T[:-1]
-    #     # selection &= T != 0
-    
-    #     # T = T[selection]
-    #     # t = t[selection]
-    
-    #     # 09/01-2020 changed 0.5 to 1.0
-    #     start = np.argmax(np.gradient(T, t)
-    #                       > lims[0])
-    #     end = np.argmax( (np.gradient(T[start:], t[start:])
-    #                       < -lims[1]) )+start
-    
-    #     theat, Theat = t[start:end], T[start:end]
-    #     tcool, Tcool = t[end:], T[end:]
+    def split(self, tc='T0'):
+        t, T = self.df['Time [s]'], self.df[tc+' [degC]']
         
-    #     return t, T, theat, Theat, tcool, Tcool, start, end, baseline
+        
+        base_mask = self.df.State == 'BEFORE'
+        baseline = T[base_mask].mean()
+        
+        heat_mask = self.df.State == 'EXPOSING'
+        theat, Theat = t[heat_mask], T[heat_mask]
+        
+        cool_mask = self.df.State == 'WAIT'
+        tcool, Tcool = t[cool_mask], T[cool_mask]
+
+        return t, T, theat, Theat, tcool, Tcool, baseline
