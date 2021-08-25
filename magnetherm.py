@@ -4,12 +4,14 @@ Created on Thu Jul 22 10:39:14 2021
 
 @author: tveile
 """
+import os
 
 import numpy as np
 import pandas as pd
 import re
 
 from scipy.signal import savgol_filter
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 def nearest_idx(array, value):
@@ -19,7 +21,7 @@ def nearest_idx(array, value):
 
 
 class Magnetherm():
-    def __init__(self, filename):
+    def __init__(self, filename, name=None):
         with open(filename, 'r') as f:
             self.props = {}
             prop_names = ['frequency', 'set_current']
@@ -39,6 +41,11 @@ class Magnetherm():
 
         self.df = pd.read_csv(filename, comment='#', delimiter='\t')
         
+        
+        if not name:
+            self.name = os.path.basename(filename)
+        else:
+            self.name = name
    
     def split(self, tc='T0'):
         t, T = self.df['Time [s]'], self.df[tc+' [degC]']
@@ -80,12 +87,19 @@ class Power():
         
         return fp[equiv]*self.C
     
-    def savgol(self, window=11, order=2, compensate=None, debug=False):
-        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split()
+    def power(self, method, compensate=None, **kwargs):
+        method = method.lower()
+        if method == 'savgol':
+            tp, heat = self.savgol(**kwargs)
         
-        fp = savgol_filter(Theat, window, order, deriv=1, delta=np.diff(theat).mean())
-        P = (fp*self.C-self.loss())
-        
+        elif method == 'box_lucas':
+            tp, heat = self.box_lucas(**kwargs)
+    
+    
+        loss = self.loss()
+        P = heat - loss[loss.size-heat.size:]
+    
+    
         if compensate is not None:
             compensate = compensate.lower()
             start = np.where(t == theat[0])[0][0]
@@ -96,56 +110,35 @@ class Power():
             
             if compensate=='linear':
                 P = P*(set_current/current)
+            
+        return tp, P 
                 
                 
+    def savgol(self, **kwargs):
+        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split()
         
-        if debug:
-            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(9, 8))
-            fheat = savgol_filter(Theat, window, order,
-                                  delta=theat.diff().mean())
-            fcool = savgol_filter(Tcool, 7, 2,
-                                  delta=theat.diff().mean())
-            
-            ax1.plot(theat, Theat, 'k', alpha=0.5, lw=3)
-            ax1.plot(theat, fheat, 'red')
-            
-            ax2.plot(tcool, Tcool, 'k', alpha=0.5, lw=3)
-            ax2.plot(tcool, fcool, 'blue')
-            
-            ax3.plot(theat, fp*self.C, 'red')
-            ax3b = ax3.twinx()
-            ax3b.plot(theat, self.loss(), 'blue')
-
+        fp = savgol_filter(Theat, 11, 2, deriv=1, delta=np.diff(theat).mean())
+        heat = fp*self.C
         
-        return theat[window:], P[window:]
-    
-    # def savgol(self, window=11, order=2, debug=False):
-    #     t, T, theat, Theat, tcool, Tcool, baseline = self.m.split()
+        return theat[11:], heat[11:]
         
-    #     fp = savgol_filter(T, window, order, deriv=1, delta=np.diff(t).mean())
-            
-    #     start = np.where(t == theat[0])[0][0]
-    #     end = np.where(t == theat[-1])[0][0]+1
+      
+    def box_lucas(self, m=None, compensate=False, **kwargs):
+        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split()
         
-    #     Ph = fp[start:end]
-    #     Pc = fp[end:]
+        if m:
+            f = lambda t, L, P: P/L*(1-np.exp(-L/(m*self.C)*t))
+            fp = lambda t, L, P: P/(m*self.C)*np.exp(-L/(m*self.C)*t)
+        else:
+            f = lambda t, L, P, m: P/L*(1-np.exp(-L/(m*self.C)*t))
+            fp = lambda t, L, P, m: P/(m*self.C)*np.exp(-L/(m*self.C)*t)
         
-    #     equiv = np.array([nearest_idx(Tcool, temperature)
-    #                       for temperature in Theat])
+        popt, pcov = curve_fit(f, theat, Theat, **kwargs)
+        
 
-                
-    #     if debug:
-    #         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(9, 8))
-            
-    #         ax1.plot(t, T)
-    #         ax2.plot(t, fp)
-    #         ax3.plot(tcool, Tcool)
-    #         ax3.plot(tcool[equiv], Tcool[equiv], 's', ms=1)
-            
-
-
-
-    #     return theat, self.C*(Ph-Pc[equiv])
+        return theat, fp(theat, *popt)*self.C
+        
+        
     
         
         
