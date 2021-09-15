@@ -73,12 +73,13 @@ class Magnetherm():
     
 
 class Power():
-    def __init__(self, Magnetherm, C):
+    def __init__(self, Magnetherm, C, TC):
         self.m = Magnetherm
         self.C = C
+        self.TC = TC
         
     def loss(self):
-        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split()
+        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
         
         fp = savgol_filter(Tcool, 9, 2, deriv=1, delta=np.diff(tcool).mean())
 
@@ -115,7 +116,7 @@ class Power():
                 
                 
     def savgol(self, **kwargs):
-        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split()
+        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
         
         fp = savgol_filter(Theat, 11, 2, deriv=1, delta=np.diff(theat).mean())
         heat = fp*self.C
@@ -124,7 +125,7 @@ class Power():
         
       
     def box_lucas(self, m=None, compensate=False, **kwargs):
-        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split()
+        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
         
         if m:
             f = lambda t, L, P: P/L*(1-np.exp(-L/(m*self.C)*t))
