@@ -58,7 +58,7 @@ class Magnetherm():
             baseline = T[0]
             print('No baseline recorded! Baseline set to: %d' %baseline)
         
-        T = T-baseline
+        #T = T-baseline
         
         heat_mask = self.df.State == 'EXPOSING'
         theat, Theat = t[heat_mask], T[heat_mask]
