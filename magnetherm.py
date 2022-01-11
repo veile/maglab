@@ -67,7 +67,7 @@ class Magnetherm():
         tcool, Tcool = t[cool_mask], T[cool_mask]
 
         # Removing points in sharp decline
-        tcool, Tcool = tcool[3:], Tcool[3:]
+        # tcool, Tcool = tcool[3:], Tcool[3:]
 
         return t.values, T.values, theat.values, Theat.values, tcool.values, Tcool.values, baseline
     
