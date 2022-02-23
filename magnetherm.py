@@ -19,9 +19,15 @@ def nearest_idx(array, value):
     idx = (np.abs(array - value)).argmin()
     return idx
 
-
+def get_slope(xpts, ypts):
+    """Function that returns the slope of a fitted line through (xpts, ypts)."""
+    popt, pcov = curve_fit(lambda x, a, b: a*x+b, xpts, ypts)
+    P = popt[0]
+    Perr = np.sqrt(np.diag(pcov))[0]
+    return P, Perr
+  
 class Magnetherm():
-    def __init__(self, filename, name=None):
+    def __init__(self, filename, tc='T0', name=None):
         with open(filename, 'r') as f:
             self.props = {}
             prop_names = ['frequency', 'set_current']
@@ -46,7 +52,13 @@ class Magnetherm():
             self.name = os.path.basename(filename)
         else:
             self.name = name
-   
+            
+        self.split(tc)
+        
+        
+    def __repr__(self):
+        return 'I=%.1f A, f=%.1f kHz' %(self.props['set_current'], self.props['frequency']*1e-3)  
+    
     def split(self, tc='T0'):
         t, T = self.df['Time [s]'], self.df[tc+' [degC]']
         
@@ -63,81 +75,128 @@ class Magnetherm():
         heat_mask = self.df.State == 'EXPOSING'
         theat, Theat = t[heat_mask], T[heat_mask]
         
+        # Removing duplicate values from heating curve
+        idx = Theat != np.roll(Theat, 1)
+        theat, Theat = theat[idx], Theat[idx]        
+        
         cool_mask = self.df.State == 'WAIT'
         tcool, Tcool = t[cool_mask], T[cool_mask]
 
-        # Removing points in sharp decline
-        # tcool, Tcool = tcool[3:], Tcool[3:]
+        # Removing duplicates from cooling curve
+        idx = Tcool != np.roll(Tcool, 1)
+        tcool, Tcool = tcool[idx], Tcool[idx]
+        
+        
+        split_df = pd.DataFrame({'theat [s]': theat, 'Theat [degC]': Theat,
 
-        return t.values, T.values, theat.values, Theat.values, tcool.values, Tcool.values, baseline
+                                 'tcool [s]': tcool, 'Tcool [degC]': Tcool} )
+                                 
+        self.df = pd.concat([self.df, split_df], axis=1)
+        
+    
     
 
 class Power():
-    def __init__(self, Magnetherm, C, TC):
+    def __init__(self, Magnetherm, C):
         self.m = Magnetherm
         self.C = C
-        self.TC = TC
+    
+    
+    def loss(self, tcool, Tcool, T, N=5):
+        i = nearest_idx(Tcool, T)
         
-    def loss(self):
-        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
+        start, end = i-int(np.floor(N/2)), i+int(np.ceil(N/2))
+        if end > tcool.size:
+            end = tcool.size
+            start = end-N
+        elif start < 0:
+            start = 0
+            end = start+N
         
-        fp = savgol_filter(Tcool, 9, 2, deriv=1, delta=np.diff(tcool).mean())
+        return get_slope(tcool[start:end], Tcool[start:end])
+    
+    def continuous_slope(self, N=5, return_seperate=False):
+        # Extracting heat and cooling curves from Magnetherm
+        theat, Theat = self.m.df['theat [s]'], self.m.df['Theat [degC]']
+        theat, Theat = theat[~np.isnan(theat)], Theat[~np.isnan(Theat)]
+        
+        tcool, Tcool = self.m.df['tcool [s]'], self.m.df['Tcool [degC]']
+        tcool, Tcool = tcool[~np.isnan(tcool)], Tcool[~np.isnan(Tcool)]
+        
+        Ptot, Ptot_err = zip(*[get_slope(theat[i:i+N], Theat[i:i+N]) for i in range(theat.size-N)])
+        Ptot, Ptot_err = np.array(Ptot), np.array(Ptot_err)
+        
+        Tp = np.array([np.mean(Theat[i:i+N]) for i in range(theat.size-N)])
+        
+        Pout, Pout_err = zip(*[self.loss(tcool, Tcool, T, N) for T in Tp])
+        
+        Pout, Pout_err = np.array(Pout), np.array(Pout_err)
+ 
+        if return_seperate:
+            return Tp, Ptot*self.C, Pout*self.C
+        
+        return Tp, (Ptot-Pout)*self.C, np.sqrt(Ptot_err**2+Pout_err**2)*self.C
+    
+    # def loss(self):
+        # t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
+        
+        # fp = savgol_filter(Tcool, 9, 2, deriv=1, delta=np.diff(tcool).mean())
 
-        equiv = np.array([nearest_idx(Tcool, temperature)
-                          for temperature in Theat])
+        # equiv = np.array([nearest_idx(Tcool, temperature)
+                          # for temperature in Theat])
         
-        return fp[equiv]*self.C
+        # return fp[equiv]*self.C
     
-    def power(self, method, compensate=None, **kwargs):
-        method = method.lower()
-        if method == 'savgol':
-            tp, heat = self.savgol(**kwargs)
+    # def power(self, method, compensate=None, **kwargs):
+        # method = method.lower()
+        # if method == 'savgol':
+            # tp, heat = self.savgol(**kwargs)
         
-        elif method == 'box_lucas':
-            tp, heat = self.box_lucas(**kwargs)
+        # elif method == 'box_lucas':
+            # tp, heat = self.box_lucas(**kwargs)
     
     
-        loss = self.loss()
-        P = heat - loss[loss.size-heat.size:]
+        # loss = self.loss()
+        # P = heat - loss[loss.size-heat.size:]
     
     
-        if compensate is not None:
-            compensate = compensate.lower()
-            start = np.where(t == theat[0])[0][0]
-            end = np.where(t == theat[-1])[0][0]
+        # if compensate is not None:
+            # compensate = compensate.lower()
+            # start = np.where(t == theat[0])[0][0]
+            # end = np.where(t == theat[-1])[0][0]
             
-            current = self.m.df['Current [A]'][start:end+1]
-            set_current = self.m.props['set_current']
+            # current = self.m.df['Current [A]'][start:end+1]
+            # set_current = self.m.props['set_current']
             
-            if compensate=='linear':
-                P = P*(set_current/current)
+            # if compensate=='linear':
+                # P = P*(set_current/current)
             
-        return tp, P 
+        # return tp, P 
                 
                 
-    def savgol(self, **kwargs):
-        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
+    # def savgol(self, **kwargs):
+        # t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
         
-        fp = savgol_filter(Theat, 11, 2, deriv=1, delta=np.diff(theat).mean())
-        heat = fp*self.C
+        # fp = savgol_filter(Theat, 11, 2, deriv=1, delta=np.diff(theat).mean())
+        # heat = fp*self.C
         
-        return theat[11:], heat[11:]
+        # return theat[11:], heat[11:]
         
       
-    def box_lucas(self, m=None, compensate=False, **kwargs):
-        t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
+    # def box_lucas(self, m=None, compensate=False, **kwargs):
+        # t, T, theat, Theat, tcool, Tcool, baseline = self.m.split(self.TC)
         
-        if m:
-            f = lambda t, L, P: P/L*(1-np.exp(-L/(m*self.C)*t))
-            fp = lambda t, L, P: P/(m*self.C)*np.exp(-L/(m*self.C)*t)
-        else:
-            f = lambda t, L, P, m: P/L*(1-np.exp(-L/(m*self.C)*t))
-            fp = lambda t, L, P, m: P/(m*self.C)*np.exp(-L/(m*self.C)*t)
+        # if m:
+            # f = lambda t, L, P: P/L*(1-np.exp(-L/(m*self.C)*t))
+            # fp = lambda t, L, P: P/(m*self.C)*np.exp(-L/(m*self.C)*t)
+        # else:
+            # f = lambda t, L, P, m: P/L*(1-np.exp(-L/(m*self.C)*t))
+            # fp = lambda t, L, P, m: P/(m*self.C)*np.exp(-L/(m*self.C)*t)
         
-        popt, pcov = curve_fit(f, theat, Theat, **kwargs)
+        # popt, pcov = curve_fit(f, theat, Theat, **kwargs)
         
 
-        return theat, fp(theat, *popt)*self.C
+        # return theat, fp(theat, *popt)*self.C
         
         
     
