@@ -25,7 +25,35 @@ def get_slope(xpts, ypts):
     P = popt[0]
     Perr = np.sqrt(np.diag(pcov))[0]
     return P, Perr
-  
+
+# fitted current and field expression
+# B = k1*I
+mu0 = 4 * np.pi * 1e-7
+N = 18
+L = 54e-3
+R1 = 13e-3
+R2 = 23e-3
+
+k1 = 1/2 * mu0*N/(R2-R1)*np.log((np.sqrt(4*R2**2+L**2)+2*R2)/(np.sqrt(4*R1**2+L**2)+2*R1))*1e3
+
+# Icoil = k2(f)*Iset
+k2 = lambda f: -8.79797909e-07*f**2 - 8.52364188e-04*f + 4.99950719e+00
+def coil_current(f, power_current):
+    return k2(f)*power_current
+
+
+def current_to_field(f, power_current, r=18e-3, L=53e-3, N=18):
+    I = coil_current(f, power_current)
+    return k1*I
+
+def field_to_current(field, f):
+    mu0 = 4*np.pi*1e-7
+    I = field/k1
+
+    return I/k2(f)
+
+
+
 class Magnetherm():
     def __init__(self, filename, tc='T0', name=None):
         with open(filename, 'r') as f:

@@ -13,9 +13,10 @@ nearest=nearest_idx
 # Class should be constructed differently with a load from file method and
 # just a df+log init
 class VSM():
-    def __init__(self, folder, fmt='%Y-%m-%d %H:%M:%S'):
+    def __init__(self, folder, fmt='%Y-%m-%d %H:%M:%S', weight=None):
         self.fmt = fmt
         self.folder = folder
+        self.weight = weight
         
         try:
             self.df = pd.read_pickle(folder+"/VSM_df.pkl")
@@ -34,7 +35,8 @@ class VSM():
         df = (df.groupby((df.index == 0).cumsum()).agg(list)
               .applymap(lambda x: np.nan if np.isnan(np.array(x)).all()
                         else np.array(x)))
-   
+        
+        
         regex_oneliners = re.compile(r'^(\S+) (\S*)$', re.MULTILINE)
         time_start = []
         time_end = []
@@ -81,8 +83,15 @@ class VSM():
         filename = glob.glob(self.folder+'/*_Log.txt')[0]
         with open(filename, 'r') as f:
                 content = f.readlines()
+                
+        profile_line = content[4]
+        self.profile = re.search('\:\s+(.*)', profile_line).group(1)
+        
+        
         content = content[6:]
-
+        
+        experimentnames = np.array([], dtype=str)
+        
         fileno = 1
         reduced = ""
         for i in range(1, len(content)):
@@ -91,13 +100,21 @@ class VSM():
                 pre = str(fileno).zfill(3)
                 fileno += 1
                 
+                
+                
                 if end == -1:
                     pre = '---'
                     fileno -= 1
                     end = content[i].find(' at ')
+                    
+                else:
+                    experimentname = content[i][:end]
+                    experimentname = experimentname.replace(' ', '')
+                    experimentnames = np.append(experimentnames, experimentname.upper())
                 
                 reduced += pre + " " + content[i][:end] +"\n"
         self.log = reduced
+        self.df['ExperimentName'] = experimentnames
         
     def print_log(self):
         try:
@@ -124,7 +141,7 @@ class VSM():
         return self
     
     def __repr__(self):
-        return self.log
+        return self.profile
         
         
     
