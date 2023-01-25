@@ -13,13 +13,19 @@ nearest=nearest_idx
 # Class should be constructed differently with a load from file method and
 # just a df+log init
 class VSM():
-    def __init__(self, folder, fmt='%Y-%m-%d %H:%M:%S', weight=None):
+    def __init__(self, folder, fmt='%Y-%m-%d %H:%M:%S', weight=None, name=None):
         self.fmt = fmt
         self.folder = folder
         self.weight = weight
         
+        
+        search = re.search(r'\/.*\/(.*) \(ProfileData\)', self.folder)
+        self.filename = search.group(1)
+        if not name:
+            self.name = self.filename
+        
         try:
-            self.df = pd.read_pickle(folder+"/VSM_df.pkl")
+            self.df = pd.read_pickle(self.folder+"/"+self.filename+".pkl")
         except IOError:
             self.make_pickle()
             
@@ -75,7 +81,13 @@ class VSM():
         df['Completed']= pd.to_datetime(df['Completed'],
                                         format=self.fmt)
 
-        df.to_pickle(self.folder+"/VSM_df.pkl")
+        # Adding average temperature information
+        try:
+            df['AvgTemperature'] = df['Temperature(C)'].apply(lambda x: np.around(np.mean(x), -1))
+        except KeyError:
+            df['AvgTemperature'] = np.nan
+
+        df.to_pickle(self.folder+"/"+self.filename+".pkl")
         
         self.df = df
         
@@ -163,7 +175,34 @@ class VSM():
         y = np.concatenate(self.df[self.df[key].notna()][key].values)
         
         return t, y    
+    
+    # Function to return temperature and moment (degC and Am^2/kg)
+    def curie(self, i=None):
+        if not i:
+            i = self.get_curie_index()
+            
+        T = self.df.iloc[i]['Temperature(C)']
+        M = self.df.iloc[i]['Moment(emu)']/(self.weight*1e-3)
+
+        return T, M
+    
+    def get_curie_index(self):
+        # Experimental code to self-find the correct index
+        exp = self.df.Experiment == 'TimeExp'
+        field = self.df.MaxField == 100
         
+        idx = np.logical_and(exp, field)
+       
+        # Checks if temperature has decreased atleast 100 C    
+        curie = self.df['Temperature(C)'][idx].apply(lambda x: x[0]-x[-1]) > 100
+        
+        return curie.index[curie == True].tolist()[0]
+     
+    
+    def hysteresis(self, field=None, temperature=None):
+        pass
+    
+    
         
     def area(self, B, M):
         if np.size(B) <2:
