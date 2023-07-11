@@ -193,12 +193,19 @@ class CHFile(object):
 
     
 class GC():
-    def __init__(self, folder):
-        self.folder = folder
+    def __init__(self, folders):
         self.TCD = []
         self.FID = []
+
+        # If folders is str input, convert to list
+        if isinstance(folders, str):
+            self.folders = [folders]
+            
+        else:
+            self.folders = folders
         
-        self.seq = glob.glob(folder+'/*.D')
+        self.seq = [glob.glob(folder+'/*.D') for folder in self.folders]
+        self.seq = [item for sublist in self.seq for item in sublist] # Flattens list
         
         for f in self.seq:
             ch_files = glob.glob(f+'/*.ch')
@@ -214,7 +221,7 @@ class GC():
                     raise Exception('No .ch file found!')
         
         if (len(self.TCD)+len(self.FID)) < 1:
-            raise Exception('No data found in specified folder')
+            raise Exception('No data found in specified folders')
     
         injected = pd.to_datetime([data.metadata['date'] for data in self.TCD],
                                   format='%d-%b-%y, %H:%M:%S')
@@ -230,6 +237,13 @@ class GC():
         
         return new
     
+    def remove_entry(self, idx):
+        self.seq.pop(idx)
+        self.TCD.pop(idx)
+        self.FID.pop(idx)
+        self.injected = np.delete(self.injected, idx)
+        
+        
     def trapz(self, tleft, tright, det='TCD', plot=False):
         if det == 'TCD':
             signals = [data.values for data in self.TCD]
