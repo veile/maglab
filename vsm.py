@@ -29,6 +29,10 @@ class VSM():
         except IOError:
             self.make_pickle()
             
+        # Adding name as a column (Implemented 27-09-2023)
+        # Name is not saved in .PKL file
+        self.df['Name'] = pd.Series([name]*len(self.df))
+            
         self.retrieve_log()
     
     def make_pickle(self):
