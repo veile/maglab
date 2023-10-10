@@ -13,7 +13,7 @@ nearest=nearest_idx
 # Class should be constructed differently with a load from file method and
 # just a df+log init
 class VSM():
-    def __init__(self, folder, fmt='%Y-%m-%d %H:%M:%S', weight=None, name=None):
+    def __init__(self, folder, fmt='%Y-%m-%d %H:%M:%S', weight=None, name=None, remake=False):
         self.fmt = fmt
         self.folder = folder
         self.weight = weight
@@ -24,11 +24,14 @@ class VSM():
         if not name:
             self.name = self.filename
         
-        try:
-            self.df = pd.read_pickle(self.folder+"/"+self.filename+".pkl")
-        except IOError:
+        if not remake:
+            try:
+                self.df = pd.read_pickle(self.folder+"/"+self.filename+".pkl")
+            except IOError:
+                self.make_pickle()
+        else:
             self.make_pickle()
-            
+                
         # Adding name as a column (Implemented 27-09-2023)
         # Name is not saved in .PKL file
         self.df['Name'] = pd.Series([name]*len(self.df))
@@ -141,8 +144,8 @@ class VSM():
     
     # Retrieving log after adding will reset log to self
     def __add__(self, other):
-        start = int( re.findall(r'\d{3} ', self.log)[-1] )
-        N = int( re.findall(r'\d{3} ', other.log)[-1] )
+        start = int( re.findall(r'(\d{3}) [a-zA-Z]', self.log)[-1] )
+        N = int( re.findall(r'(\d{3}) [a-zA-Z]', other.log)[-1] )
         
         add_log = re.sub(r'\d{3} ',
                          lambda x: str(int(x.group(0))+start).zfill(3)+" ",
