@@ -244,17 +244,18 @@ class GC():
         self.injected = np.delete(self.injected, idx)
         
         
-    def trapz(self, tleft, tright, det='TCD', plot=False):
+    def trapz(self, tleft, tright, det='TCD', idx=slice(None), plot=False):
+    
         if det == 'TCD':
-            signals = [data.values for data in self.TCD]
+            signals = [data.values for data in self.TCD[idx]]
             times = [np.linspace(data.metadata['start_time'],
                                  data.metadata['end_time'],
-                                 len(data.values)) for data in self.TCD]
+                                 len(data.values)) for data in self.TCD[idx]]
         if det == 'FID':
-            signals = [data.values for data in self.FID]
+            signals = [data.values for data in self.FID[idx]]
             times = [np.linspace(data.metadata['start_time'],
                                  data.metadata['end_time'],
-                                 len(data.values)) for data in self.FID]
+                                 len(data.values)) for data in self.FID[idx]]
         
         if plot:
             fig, ax = plt.subplots(figsize=(9, 6))
@@ -273,17 +274,18 @@ class GC():
             
             t, y = t[ileft:iright], y[ileft:iright]
             
-            # Finding baseline by fitting a linear fit between first
-            # and last point.
-            a = (y[-1]-y[0])/(t[-1]-t[0])
-            b = y[0]-a*t[0]
+            # # Finding baseline by fitting a linear fit between first
+            # # and last point.
+            # a = (y[-1]-y[0])/(t[-1]-t[0])
+            # b = y[0]-a*t[0]
             
-            base = a*t+b
+            # base = a*t+b
+            base = np.linspace(y[0], y[-1], y.size)
             
             areas.append(np.trapz(y-base, t, dx=np.diff(t).mean())*60) # unit of µV*s
             
             if plot:
-                ax.plot(t, y-base, label=f'Seq. {i}')
+                ax.plot(t, y-base, label=f'Seq. {idx.start+i}')
         
         if plot:
             ax.legend(loc='upper left', bbox_to_anchor=(1, 1.02))
