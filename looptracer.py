@@ -62,12 +62,13 @@ def get_distortion_correction(f, I, V):
     # Phase transfer denotes the phase shift imposed by the pick-up system
     # The phase shift needs to be added onto the measured phase.
     # A coil has the voltage V = L dI/dt, so the expected voltage is 90 degree shifted from the current
-    Pexp = np.angle(I*np.exp(1j*np.pi/2))
+    Pexp = np.angle(I*np.exp(-1j*np.pi/2))
 
     # This is to correctly add angles
     # pi is added to get the phase in range of 0 - 2pi to use modulus and then subtract eh pi again.
-    phase_transfer = (Pexp - np.angle(V) +np.pi) % (2*np.pi) - np.pi
-    # phase_transfer = np.angle(np.exp(1j*Pexp)*np.exp(-1j*np.angle(V)))
+    # phase_transfer = (Pexp - np.angle(V) +np.pi) % (2*np.pi) - np.pi
+    phase_transfer = np.angle(np.exp(1j*Pexp)*np.exp(-1j*np.angle(V)))
+    # phase_transfer = Pexp - np.angle(V)
     
     return interp1d(f, mag_transfer), interp1d(f, phase_transfer)
 
@@ -103,12 +104,14 @@ def get_coeff(df, mag_transfer = lambda f: 1, phase_transfer = lambda f: 0, phas
     ϕv = np.angle(np.exp(1j*( P_C+np.pi/2 )))
 
     # # Magnetic Moment
-    phase_corrections = np.zeros(f.size)
-    phase_corrections[0] = phase_correction
+    phase_corrections = np.ones(f.size) * phase_correction
+    # phase_corrections[0] = phase_correction
     
-    V = (+np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P )\
-         -np.sqrt(2)*RS*mag_transfer(fS)*np.exp(1j*PS))*np.exp(-1j*phase_corrections)
+    # V = (+np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P )\
+         # -np.sqrt(2)*RS*mag_transfer(fS)*np.exp(1j*PS))*np.exp(-1j*phase_corrections)
 
+    V = (np.sqrt(2)*RS*mag_transfer(fS)*np.exp(1j*PS) -\
+         np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P ))*np.exp(-1j*phase_corrections)
 
     M = np.abs(V)/(2*np.pi*fS)
     ϕ = np.angle(V*np.exp(1j*np.pi/2))
@@ -130,6 +133,8 @@ class LoopTracer():
         self.phase_correction = phase_correction
 
         self.distortion = self.create_distortion_dict(distortion_path)
+        # self.distortion = {'imp50': {}, 'HiZ': {}}
+        # self.distortion['HiZ']['Mag Transfer'], self.distortion['HiZ']['Phase Transfer'] = lambda f: 1, lambda f: 0
         
         self.foldername = path[path.rfind('/')+1:]
         
@@ -211,6 +216,7 @@ class LoopTracer():
             cap = df_row['capacitor']
 
             phase_correction = self.phase_correction[cap]*2*np.pi/360
+            # phase_correction = np.mean(self.phase_correction[cap]['diff'], axis=0)
 
             if df_row['imp50']:
                 mag_transfer = self.distortion['imp50']['Mag Transfer']
