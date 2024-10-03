@@ -100,8 +100,8 @@ def get_coeff(df, mag_transfer = lambda f: 1, phase_transfer = lambda f: 0, phas
 
     # Applied field
     Hv = np.sqrt(2)*R_C/(2*np.pi*f_C)
+    ϕv = np.angle(np.exp(1j*( PS_C+np.pi/2 )))
     # ϕv = np.pi/2
-    ϕv = np.angle(np.exp(1j*( P_C+np.pi/2 )))
 
     # # Magnetic Moment
     phase_corrections = np.ones(f.size) * phase_correction
