@@ -98,6 +98,9 @@ def get_coeff(df, mag_transfer = lambda f: 1, phase_transfer = lambda f: 0, phas
     P  = np.angle(np.exp(1j*(P  + phase_transfer(f ))))
     PS = np.angle(np.exp(1j*(PS + phase_transfer(fS))))
 
+
+    phase_change = PS_C - P_C
+    
     # Applied field
     Hv = np.sqrt(2)*R_C/(2*np.pi*f_C)
     ϕv = np.angle(np.exp(1j*( PS_C+np.pi/2 )))
@@ -109,9 +112,10 @@ def get_coeff(df, mag_transfer = lambda f: 1, phase_transfer = lambda f: 0, phas
     
     # V = (+np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P )\
          # -np.sqrt(2)*RS*mag_transfer(fS)*np.exp(1j*PS))*np.exp(-1j*phase_corrections)
+    phase_changes = np.ones(f.size)*phase_change
 
     V = (np.sqrt(2)*RS*mag_transfer(fS)*np.exp(1j*PS) -\
-         np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P ))*np.exp(-1j*phase_corrections)
+         np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P ))*np.exp(-1j*phase_corrections)*np.exp(-1j*phase_changes)
 
     M = np.abs(V)/(2*np.pi*fS)
     ϕ = np.angle(V*np.exp(1j*np.pi/2))
