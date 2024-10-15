@@ -131,9 +131,8 @@ class LoopTracer():
         phase_correction: Dictionary with phase correction values for each capacitance
         name: string identifier saved in self.name. Defaults to folder name if not specified
     '''
-    def __init__(self, path, weight, distortion_path, phase_correction, name=None):
+    def __init__(self, path, distortion_path, phase_correction, name=None):
         self.path = path
-        self.weight = weight
         self.phase_correction = phase_correction
 
         self.distortion = self.create_distortion_dict(distortion_path)
@@ -234,7 +233,7 @@ class LoopTracer():
             return Hv, ϕv, M, ϕ
 
         df['H0*'], df['Hp'], df['Mn*'], df['Mpn'] = zip(*df.apply(get_HM_wrapper, axis=1))
-        df['Mn*'] = df['Mn*']/self.weight
+        df['Mn*'] = df['Mn*']
         
         self.df = df
         
