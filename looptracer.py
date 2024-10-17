@@ -98,8 +98,8 @@ def get_coeff(df, mag_transfer = lambda f: 1, phase_transfer = lambda f: 0, phas
     P  = np.angle(np.exp(1j*(P  + phase_transfer(f ))))
     PS = np.angle(np.exp(1j*(PS + phase_transfer(fS))))
 
-
-    phase_change = PS_C - P_C
+    
+    n = fS/fS[0]
     
     # Applied field
     Hv = np.sqrt(2)*R_C/(2*np.pi*f_C)
@@ -108,14 +108,9 @@ def get_coeff(df, mag_transfer = lambda f: 1, phase_transfer = lambda f: 0, phas
 
     # # Magnetic Moment
     phase_corrections = np.ones(f.size) * phase_correction
-    # phase_corrections[0] = phase_correction
-    
-    # V = (+np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P )\
-         # -np.sqrt(2)*RS*mag_transfer(fS)*np.exp(1j*PS))*np.exp(-1j*phase_corrections)
-    phase_changes = np.ones(f.size)*phase_change
 
     V = (np.sqrt(2)*RS*mag_transfer(fS)*np.exp(1j*PS) -\
-         np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P ))*np.exp(-1j*phase_corrections)*np.exp(-1j*phase_changes)
+         np.sqrt(2)*R *mag_transfer(f )*np.exp(1j*P ))*np.exp(-1j*phase_corrections)
 
     M = np.abs(V)/(2*np.pi*fS)
     ϕ = np.angle(V*np.exp(1j*np.pi/2))
@@ -223,7 +218,7 @@ class LoopTracer():
 
             if df_row['imp50']:
                 mag_transfer = self.distortion['imp50']['Mag Transfer']
-                phase_transfer =self.distortion['imp50']['Phase Ttransfer']
+                phase_transfer =self.distortion['imp50']['Phase Transfer']
             else:
                 mag_transfer = self.distortion['HiZ']['Mag Transfer']
                 phase_transfer =self.distortion['HiZ']['Phase Transfer']
